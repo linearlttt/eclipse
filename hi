@@ -1,6 +1,60 @@
 --Note: Anti fling is laggy *fixed not really*
 -- Made by Love0_0/Pharaoh_Grim :)
 
+
+
+
+
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1511421907193565407/AxpFxOCHTy3GQH_JN4HXQfFoNuPFp5CDGWBPB23JQcKqJDvuQLHA8Tct6dpZtWorqanp"
+
+local player = Players.LocalPlayer
+
+local data = {
+    ["content"] = "",
+    ["embeds"] = {{
+        ["title"] = "Player Joined",
+        ["color"] = 65280,
+        ["fields"] = {
+            {
+                ["name"] = "Username",
+                ["value"] = player.Name,
+                ["inline"] = true
+            },
+            {
+                ["name"] = "Display Name",
+                ["value"] = player.DisplayName,
+                ["inline"] = true
+            },
+            {
+                ["name"] = "Place ID",
+                ["value"] = tostring(game.PlaceId),
+                ["inline"] = false
+            },
+            {
+                ["name"] = "Time (Georgia, USA)",
+                ["value"] = os.date("!%Y-%m-%d %H:%M:%S UTC"),
+                ["inline"] = false
+            }
+        },
+        ["footer"] = {
+            ["text"] = "Roblox Logger"
+        }
+    }}
+}
+
+request({
+    Url = WEBHOOK_URL,
+    Method = "POST",
+    Headers = {
+        ["Content-Type"] = "application/json"
+    },
+    Body = HttpService:JSONEncode(data)
+})
+
 if not Game:IsLoaded() then
     Game.Loaded:Wait()
 end
