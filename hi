@@ -1,1 +1,1001 @@
+--Note: Anti fling is laggy *fixed not really*
+-- Made by Love0_0/Pharaoh_Grim :)
 
+if not Game:IsLoaded() then
+    Game.Loaded:Wait()
+end
+
+if not _G.Eclipse then _G.Eclipse = true end
+
+_G.UIColor = Color3.fromRGB(225, 0, 0)
+local UiLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/LzRequiemz/Azure/refs/heads/main/UILibrary.lua"))()
+local MainWindow = UiLibrary:Window({ScriptName = "Eclipse",Text = "| Fight in a School", LabelColor = _G.UIColor})
+local PlayerTab = MainWindow:Tab({Text = "Player"})
+local CombatTab = MainWindow:Tab({Text = "Combat"})
+local AutoFarmTab = MainWindow:Tab({Text = "Autofarm"})
+local SettingsTab = MainWindow:Tab({Text = "Settings"})
+
+local PlayerSection = PlayerTab:Section({Text = "Player Settings"})
+local WeaponSection = PlayerTab:Section({Text = "Weapons Settings", Side = "Right"})
+local WeaveSection = CombatTab:Section({Text = "Weave Modification"})
+local HitboxSection = CombatTab:Section({Text = "Hitbox Settings", Side = "Right"})
+local LockOnSection = CombatTab:Section({Text = "Lock On", Side = "Right"})
+local AttackSection = CombatTab:Section({Text = "Attack Settings"})
+local FarmSection = AutoFarmTab:Section({Text = "Autofarm"})
+local ServerSection = AutoFarmTab:Section({Text = "Server", Side = "Right"})
+local RespectSection = AutoFarmTab:Section({Text = "Respect"})
+local WorldSection = SettingsTab:Section({Text = "World Modification", Side = "Right"})
+local UISection = SettingsTab:Section({Text = "Game UI"})
+local HotkeySection = SettingsTab:Section({Text = "Combat Config"})
+
+local SpawnLocations = {
+    ["Outside"] = {CFrame.new(-164, 5, -156), CFrame.new(-141, 5, -97), CFrame.new(-200, 5, -187), CFrame.new(-200, 5, -125), CFrame.new(-260, 5, -95)},
+    ["Hallway"] = {CFrame.new(-200, 5, 62), CFrame.new(-200, 5, 123), CFrame.new(-169, 5, 190)},
+    ["Gym"] = {CFrame.new(-273, 5, 14), CFrame.new(-130, 5, 21), CFrame.new(-113, 5, -30)},
+    ["Library"] = {CFrame.new(-114, 5, 124), CFrame.new(-122, 5, 197), CFrame.new(-146, 5, 125)},
+    ["Bathroom"] = {CFrame.new(-213, 5, 241), CFrame.new(-252, 5, 240)}
+}
+
+local Services = {}
+local Variables = {}
+local Rigs = {}
+
+local States = {}
+local Configs = {}
+local Playerlist = {}
+local Blacklisted = {}
+local TeamPart = {}
+local HitAnimNames = {}
+local DownHitNames = {}
+
+Services.Players = Game:GetService("Players")
+Services.Lighting = Game:GetService("Lighting")
+Services.RunService = Game:GetService("RunService")
+Services.Workspace = Game:GetService("Workspace")
+Services.UserInputService = Game:GetService("UserInputService")
+Services.ReplicatedStorage = Game:GetService("ReplicatedStorage")
+Services.HttpService = Game:GetService("HttpService")
+Services.TeleportService = Game:GetService("TeleportService")
+
+Variables.LocalPlayer = Services.Players.LocalPlayer
+Variables.Character = Variables.LocalPlayer.Character or Variables.LocalPlayer.CharacterAdded:Wait()
+Variables.Backpack = Variables.LocalPlayer:WaitForChild("Backpack")
+Variables.PlayerGui = Variables.LocalPlayer:WaitForChild("PlayerGui")
+Variables.Bar = Variables.PlayerGui.Main.Other:WaitForChild("Top_Bar")
+Variables.Class = Variables.LocalPlayer:WaitForChild("leaderstats"):FindFirstChild("Class")
+Variables.Remote = Variables.LocalPlayer:WaitForChild("Communicate"):WaitForChild("Interface"):WaitForChild("RemoteEvent")
+Variables.AirPart = Instance.new("Part", Services.Workspace)
+
+Rigs.RootPart = Variables.Character:WaitForChild("HumanoidRootPart")
+Rigs.Humanoid = Variables.Character:WaitForChild("Humanoid")
+
+States.AutoFarm = false
+States.AutoEquip = false
+States.AutoWeave = false
+States.AutoBuy = false
+States.PunchAura = false
+States.WeaveGlide = false
+States.AntiStun = false
+States.AntiFling = false
+States.Hitbox = false
+States.ShowHitbox = false
+States.Macro = false
+States.GroundCheck = false
+States.GodMode = false
+States.Movement = false
+States.Interact = false
+States.LockOn = false
+States.SetSpawn = false
+States.AutoReset = false
+
+Configs.BlinkSpeed = 3
+Configs.GlideStrength = 3
+Configs.WeaveDelay = 0.3
+Configs.AuraDelay = 0.3
+Configs.PunchSpeed = 1.5
+Configs.HitboxSize = 5
+Configs.HitboxTransparency = 0
+Configs.HealthAmount = 50
+Configs.LockOnDistance = 25
+Configs.Distance = 20
+Configs.FarmDuration = 10
+Configs.Prediction = 0.1
+Configs.PlayerIndex = 1
+
+Configs.WeaveTime = 0
+Configs.AuraTime = 0
+Configs.HitboxTime = 0
+Configs.FarmTime = 0
+Configs.RefreshTime = 0
+
+Configs.MacroKey = Enum.KeyCode.E
+
+Configs.CurrentHand = "RightHand"
+Configs.UiPos = "Top"
+
+Configs.FarmType = nil
+Configs.PlayerType = nil
+Configs.PlayerPosition = nil
+Configs.MovementType = nil
+Configs.SpawnPos = nil
+Configs.Weapon = nil
+Configs.Target = nil
+Configs.TargetName = nil
+Configs.PlayerSort = nil
+
+Variables.AirPart.Anchored = true
+Variables.AirPart.Size = Vector3.new(6, 1, 6)
+Variables.AirPart.Transparency = 1
+Variables.AirPart.CanCollide = false
+Variables.AirPart.Name = "AutoFarmHover"
+
+function SafeCall(args1)
+    local Success, Metatable = pcall(getrawmetatable, args1)
+    return Success and Metatable or nil
+end
+
+function GetRemote()
+    local CoreObject = Variables.Character:FindFirstChild("Core")
+    local CommunicateObject = CoreObject and CoreObject:FindFirstChild("Communicate")
+    if not CommunicateObject then return nil end
+    for _, Child in ipairs(CommunicateObject:GetChildren()) do
+        if Child:IsA("RemoteEvent") then
+            return Child
+        end
+    end
+    return nil
+end
+
+function GetPlayer(args1)
+    args1 = string.lower(tostring(args1))
+
+    for _, Player in ipairs(Services.Players:GetPlayers()) do
+        if Player == Variables.LocalPlayer then
+            continue
+        end
+
+        local Username = string.lower(Player.Name)
+        local DisplayName = string.lower(Player.DisplayName)
+
+        if Username == args1 then
+            return Player
+        end
+
+        if DisplayName == args1 then
+            return Player
+        end
+    end
+
+    for _, Player in ipairs(Services.Players:GetPlayers()) do
+        if Player == Variables.LocalPlayer then
+            continue
+        end
+
+        local Username = string.lower(Player.Name)
+        local DisplayName = string.lower(Player.DisplayName)
+
+        if string.find(Username, args1, 1, true)
+        or string.find(DisplayName, args1, 1, true) then
+            return Player
+        end
+    end
+end
+
+function UpdatePlayerList(args1)
+    Playerlist = {}
+    for _, PlayerObj in ipairs(Services.Players:GetPlayers()) do
+        local Valid = true
+        if PlayerObj == Variables.LocalPlayer then Valid = false end
+        if Blacklisted[PlayerObj.UserId] then Valid = false end
+        if not (PlayerObj.Character and PlayerObj.Character:FindFirstChild("HumanoidRootPart") and PlayerObj.Character:FindFirstChildOfClass("Humanoid")) then Valid = false end
+        if Valid and PlayerObj.Character:FindFirstChildOfClass("Humanoid").Health <= 0 then Valid = false end
+
+        if Valid and args1 then
+            Valid = args1(PlayerObj)
+        end
+        if Valid then
+            table.insert(Playerlist, PlayerObj)
+        end
+    end
+
+    if Configs.PlayerSort == "Target" then
+        local TargetInput = Configs.TargetName and string.lower(Configs.TargetName) or nil
+        local FilteredTable = {}
+        if TargetInput and TargetInput ~= "" then
+            for _, PlayerObj in ipairs(Playerlist) do
+                local Username = string.lower(PlayerObj.Name)
+                if Username == TargetInput then
+                    table.insert(FilteredTable, PlayerObj)
+                end
+            end
+
+            if #FilteredTable == 0 then
+                for _, PlayerObj in ipairs(Playerlist) do
+                    local DisplayName = string.lower(PlayerObj.DisplayName)
+                    if DisplayName == TargetInput then
+                        table.insert(FilteredTable, PlayerObj)
+                    end
+                end
+            end
+            -- If still nothing, fall back to substring match
+            if #FilteredTable == 0 then
+                for _, PlayerObj in ipairs(Playerlist) do
+                    local Username = string.lower(PlayerObj.Name)
+                    local DisplayName = string.lower(PlayerObj.DisplayName)
+                    if string.find(Username, TargetInput, 1, true) or string.find(DisplayName, TargetInput, 1, true) then
+                        table.insert(FilteredTable, PlayerObj)
+                    end
+                end
+            end
+        end
+        Playerlist = FilteredTable
+    elseif Configs.PlayerSort == "Low Health" then
+        local FilteredTable = {}
+        for _, PlayerObj in ipairs(Playerlist) do
+            local HumObj = PlayerObj.Character and PlayerObj.Character:FindFirstChildOfClass("Humanoid")
+            if HumObj and HumObj.Health < Configs.HealthAmount then
+                table.insert(FilteredTable, PlayerObj)
+            end
+        end
+        Playerlist = FilteredTable
+    elseif Configs.PlayerSort == "Random" then
+        for i = #Playerlist, 2, -1 do
+            local j = math.random(i)
+            Playerlist[i], Playerlist[j] = Playerlist[j], Playerlist[i]
+        end
+    end
+
+    if Configs.PlayerIndex > #Playerlist then
+        Configs.PlayerIndex = 1
+    end
+end
+
+function Teleport(args1, args2)
+    local TargetRootPart = args1.Character:FindFirstChild("HumanoidRootPart")
+    local TargetHumanoid = args1.Character:FindFirstChildOfClass("Humanoid")
+    if not (Rigs.RootPart and TargetRootPart) then return end
+
+    local StartTime = tick()
+    local DurationValue = args2 or Configs.FarmDuration
+
+    repeat
+		Rigs.RootPart.CFrame = (TargetRootPart.CFrame + Vector3.new(0, 3, 0) + (TargetRootPart.Velocity * Configs.Prediction))
+        task.wait()
+    until not States.AutoFarm or not TargetHumanoid or TargetHumanoid.Health <= 0 or tick() - StartTime > DurationValue
+end
+
+function WallCheckFunction(args1, args2)
+    local RayParams = RaycastParams.new()
+    RayParams.FilterDescendantsInstances = {Variables.Character}
+    RayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local RayResult = Services.Workspace:Raycast(args1, args2 - args1, RayParams)
+    if RayResult and RayResult.Instance then
+        local HitModel = RayResult.Instance:FindFirstAncestorOfClass("Model")
+        if HitModel and HitModel:FindFirstChild("HumanoidRootPart") then
+            return true
+        else
+            return false
+        end
+    end
+    return true
+end
+
+function GetClosestPlayer()
+    if not Rigs.RootPart then return nil end
+    local ClosestPlayerObj = nil
+    local ClosestDistance = math.huge
+    for _, PlayerObj in ipairs(Services.Players:GetPlayers()) do
+        if
+            PlayerObj ~= Variables.LocalPlayer
+            and PlayerObj.Character
+            and PlayerObj.Character:FindFirstChild("HumanoidRootPart")
+            and PlayerObj.Character:FindFirstChildOfClass("Humanoid")
+            and PlayerObj.Character:FindFirstChildOfClass("Humanoid").Health > 0
+        then
+            local PlayerRootPart = PlayerObj.Character:FindFirstChild("HumanoidRootPart")
+            local Distance = (Rigs.RootPart.Position - PlayerRootPart.Position).Magnitude
+            if Distance < ClosestDistance then
+                if WallCheckFunction(Rigs.RootPart.Position, PlayerRootPart.Position) then
+                    ClosestDistance = Distance
+                    ClosestPlayerObj = PlayerObj
+                end
+            end
+        end
+    end
+    return ClosestPlayerObj
+end
+
+function BuyWeapon()
+    if Configs.Weapon then
+        Variables.Remote:FireServer("BuyWeapon", Configs.Weapon)
+    end
+end
+
+function Attack(args1)
+    if not (Rigs.Humanoid and Rigs.RootPart) then return end
+
+    local AttackRemoteEvent = GetRemote()
+    local TargetPlayerObj = args1
+
+    -- Fix: If PlayerSort == "Target", get the first valid target from the Playerlist.
+    if not TargetPlayerObj and Configs.PlayerSort == "Target" and #Playerlist > 0 then
+        TargetPlayerObj = Playerlist[1]
+    end
+    if not TargetPlayerObj then
+        TargetPlayerObj = GetClosestPlayer()
+    end
+
+    if AttackRemoteEvent and TargetPlayerObj and TargetPlayerObj.Character then
+        local TargetRoot = TargetPlayerObj.Character:FindFirstChild("HumanoidRootPart")
+        if TargetRoot then
+            local Distance = (Rigs.RootPart.Position - TargetRoot.Position).Magnitude
+            if Distance > Configs.Distance then return end
+            local HitLimb = TargetPlayerObj.Character:FindFirstChild("LeftLowerLeg") or TargetRoot
+            local NextHand = (Configs.CurrentHand == "RightHand") and "LeftHand" or "RightHand"
+            pcall(function()
+                AttackRemoteEvent:FireServer("Attack", {
+                    Point = TargetRoot.Position,
+                    Combo = 5,
+                    Class = Variables.Class.Value,
+                    IsKnockdown = false,
+                    Character = TargetPlayerObj.Character,
+                    Hit = HitLimb,
+                    Limb = Configs.CurrentHand,
+                    Classs = "{BF174C4F-D904-4B0C-8C31-6DE105CC786E}",
+                    Result = nil
+                }, false)
+                AttackRemoteEvent:FireServer("Swing", {Limb = Configs.CurrentHand})
+                task.wait()
+                AttackRemoteEvent:FireServer("Swing", {Limb = NextHand})
+            end)
+            Configs.CurrentHand = NextHand
+        end
+    end
+end
+
+function ToggleAutoFarm(args1)
+	if not Configs.FarmType == "Server" then return end
+    States.AutoFarm = args1
+    States.AutoEquip = args1
+	States.HitAura = args1
+	
+    if not args1 then return end
+
+    local SkipList = {}
+    local PlayerIdCache
+
+    if not Variables.AirPart then
+        Variables.AirPart = Instance.new("Part", Workspace)
+        Variables.AirPart.Anchored = true
+        Variables.AirPart.Size = Vector3.new(6, 1, 6)
+        Variables.AirPart.Transparency = 1
+        Variables.AirPart.CanCollide = false
+        Variables.AirPart.Name = "AutoFarmHover"
+    end
+
+    task.spawn(function()
+        while States.AutoFarm and Configs.FarmType == "Server" and task.wait() do
+			Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			Services.UserInputService.MouseIconEnabled = args1
+			
+            UpdatePlayerList(function(PlayerObj)
+                if SkipList[PlayerObj.UserId] then return false end
+                if PlayerObj:FindFirstChild("Loaded").Value == false then return false end
+                local HumanoidObj = PlayerObj.Character and PlayerObj.Character:FindFirstChildOfClass("Humanoid")
+                if not (HumanoidObj and HumanoidObj.Health > 0) then return false end
+                return true
+            end)
+
+            if #Playerlist == 0 then
+                Configs.Target = nil
+                Configs.PlayerIndex = 1
+                task.wait(1)
+                continue
+            end
+
+            local PlayerIdx = Configs.PlayerIndex
+            local AttemptCount = 0
+            local TargetPlayerObj = nil
+            while not TargetPlayerObj and AttemptCount < #Playerlist do
+                TargetPlayerObj = Playerlist[PlayerIdx]
+                if not TargetPlayerObj or not TargetPlayerObj.Character or not TargetPlayerObj.Character:FindFirstChild("HumanoidRootPart") then
+                    TargetPlayerObj = nil
+                elseif SkipList[TargetPlayerObj.UserId] then
+                    TargetPlayerObj = nil
+                end
+                if not TargetPlayerObj then
+                    PlayerIdx = (PlayerIdx % #Playerlist) + 1
+                end
+                AttemptCount = AttemptCount + 1
+            end
+
+            Configs.PlayerIndex = PlayerIdx
+            if TargetPlayerObj and TargetPlayerObj ~= Variables.LocalPlayer then
+                local Success, ErrorMsg = pcall(function()
+                    if PlayerIdCache ~= TargetPlayerObj.UserId then
+                        PlayerIdCache = TargetPlayerObj.UserId
+                    end
+                    Variables.AirPart.CFrame = Rigs.RootPart.CFrame * CFrame.new(0, -3.5, 0)
+                    Teleport(TargetPlayerObj, Configs.FarmDuration)
+                end)
+                if not Success then
+                    SkipList[TargetPlayerObj.UserId] = true
+                    Configs.PlayerIndex = (Configs.PlayerIndex % #Playerlist) + 1
+                end
+            else
+                Configs.PlayerIndex = (Configs.PlayerIndex % #Playerlist) + 1
+            end
+        end
+
+        if Variables.AirPart then pcall(function() Variables.AirPart:Destroy() end) end
+    end)
+end
+
+local Connections = {}
+function DisableThrowables(args1)
+    States.Interact = args1
+
+    local Interaction = workspace:FindFirstChild("Map")
+        and workspace.Map:FindFirstChild("Interaction")
+
+    if not Interaction then
+        return
+    end
+
+    local function Taken(model, value)
+        if model:IsA("Model") then
+            model:SetAttribute("Taken", value)
+        end
+    end
+
+    for _, connection in ipairs(Connections) do
+        connection:Disconnect()
+    end
+    table.clear(Connections)
+
+    for _, folder in ipairs(Interaction:GetChildren()) do
+        if folder:IsA("Folder") then
+
+            for _, model in ipairs(folder:GetChildren()) do
+                Taken(model, args1)
+            end
+
+            if args1 then
+                table.insert(Connections,
+                    folder.ChildAdded:Connect(function(model)
+                        Taken(model, true)
+                    end)
+                )
+            end
+        end
+    end
+end
+
+function SetHitbox(args1, arg2)
+    if not args1 or not args1.Character then
+        return
+    end
+
+    local CharObj = args1.Character
+    local Humanoid = CharObj:FindFirstChildOfClass("Humanoid")
+    local RootPart = CharObj:FindFirstChild("HumanoidRootPart")
+    if not Humanoid or not RootPart then
+        return
+    end
+
+    local KnockedObj = CharObj:FindFirstChild("Knocked")
+    local IsKnocked = KnockedObj and KnockedObj.Value == true
+
+    if arg2 and Humanoid.Health > 0 and not (States.GroundCheck and IsKnocked) then
+        RootPart.Size = Vector3.new(Configs.HitboxSize, Configs.HitboxSize, Configs.HitboxSize)
+    else
+        RootPart.Size = Vector3.new(2, 5, 1)
+    end
+
+    RootPart.Transparency = 1
+    RootPart.CanCollide = false
+    RootPart.CanTouch = false
+    --RootPart.Massless = true
+
+    local highlight = RootPart:FindFirstChild("EclipseHitboxHighlight")
+    if not highlight then
+        highlight = Instance.new("SelectionBox")
+        highlight.Name = "EclipseHitboxHighlight"
+        highlight.Adornee = RootPart
+        highlight.LineThickness = 0.05
+        highlight.SurfaceTransparency = 1
+        highlight.Parent = RootPart
+    end
+
+    highlight.Color3 = _G.UIColor
+    highlight.Visible = arg2 and States.ShowHitbox
+end
+
+function SetupPlayer(args1)
+    Variables.Character = args1
+    Rigs.Humanoid = args1:WaitForChild("Humanoid")
+    Rigs.RootPart = args1:WaitForChild("HumanoidRootPart")
+    Variables.Backpack = Variables.LocalPlayer:WaitForChild("Backpack")
+    UpdatePlayerList()
+    if States.AutoBuy then BuyWeapon() end
+    if States.AutoFarm then
+        if Configs.PlayerType == "Left [ALT]" then
+            Rigs.RootPart.CFrame = CFrame.new(-74, 5, -4)
+        end
+    end
+    if States.SetSpawn then
+        task.wait(0.1)
+        if Configs.SpawnPos and SpawnLocations[Configs.SpawnPos] then
+            Rigs.RootPart.CFrame = SpawnLocations[Configs.SpawnPos][math.random(1, #SpawnLocations[Configs.SpawnPos])]
+        end
+    end
+end
+
+PlayerSection:Toggle({Text = "Movement Modifier", Callback = function(v) States.Movement = v end})
+PlayerSection:RadioButton({Text = "Movement Mode", Options = {"Blink", "Sprint"}, Callback = function(v) Configs.MovementType = v end})
+PlayerSection:Slider({Text = "Speed", Default = 1, Minimum = 0.1, Maximum = 10, Precise = true, Flag = "WalkSpeed", Callback = function(v) Configs.BlinkSpeed = v end})
+PlayerSection:Toggle({
+    Text = "Godmode", Callback = function(v)
+        States.GodMode = v
+        if v then Rigs.Humanoid.Health = 0 end
+    end
+})
+PlayerSection:Toggle({
+    Text = "Debug Mode",
+    Callback = function(v)
+        if Variables.LocalPlayer:FindFirstChild("Settings") and Variables.LocalPlayer.Settings:FindFirstChild("Debug") then
+            Variables.LocalPlayer.Settings.Debug.Value = v
+        end
+    end
+})
+PlayerSection:Toggle({
+    Text = "Anti Fling",
+    Callback = function(v)
+        States.AntiFling = v
+    end
+})
+WeaponSection:Toggle({
+    Text = "Auto Buy Weapon",
+    Callback = function(v) States.AutoBuy = v if v then BuyWeapon() end end
+})
+
+WeaponSection:RadioButton({
+    Text = "Weapons", Options = {"Sneakers", "Boxing Gloves", "Shank", "Bat", "Brass Knuckles"}, Callback = function(v) Configs.Weapon = v end
+})
+PlayerSection:Button({
+    Text = "Rejoin",
+    Callback = function()
+        Services.TeleportService:TeleportToPlaceInstance(Game.PlaceId, Game.JobId, Variables.Players)
+    end
+})
+
+WeaveSection:Toggle({
+    Text = "Auto Weave", Callback = function(v) States.AutoWeave = v end
+})
+WeaveSection:Slider({
+    Text = "Weave Delay", Default = 0.1, Minimum = 0.1, Maximum = 0.5, Precise = true, Flag = "WeaveDelay",
+    Callback = function(v) Configs.WeaveDelay = v end
+})
+WeaveSection:Toggle({
+    Text = "Weave Glide", Callback = function(v) States.WeaveGlide = v end
+})
+WeaveSection:Slider({
+    Text = "Distance", Default = 3.2, Minimum = 3, Maximum = 10, Precise = true, Flag = "WeaveDistance",
+    Callback = function(v) Configs.GlideStrength = v end
+})
+
+HitboxSection:Toggle({
+    Text = "Enabled", Callback = function(v) States.Hitbox = v end
+})
+HitboxSection:Toggle({
+    Text = "Show Hitbox", Callback = function(v) States.ShowHitbox = v end
+})
+HitboxSection:Toggle({
+    Text = "GroundHit Check", Callback = function(v) States.GroundCheck = v end
+})
+HitboxSection:Slider({
+    Text = "Hitbox Size", Default = 4, Minimum = 2, Maximum = 8, Flag = "Size",
+    Callback = function(v) Configs.HitboxSize = v end
+})
+LockOnSection:Toggle({
+    Text = "Enabled",
+    Callback = function(v) States.LockOn = v end
+})
+LockOnSection:Slider({
+    Text = "LockOn Distance", Default = 30, Minimum = 25, Maximum = 30, Flag = "LockonDistance",
+    Callback = function(v) Configs.LockonDistance = v end
+})
+AttackSection:Toggle({
+    Text = "Kill Aura", Callback = function(v) States.HitAura = v end
+})
+AttackSection:Slider({
+    Text = "Aura Delay", Default = 0.3, Minimum = 0.1, Maximum = 0.5, Precise = true, Flag = "AuraDelay",
+    Callback = function(v) Configs.AuraDelay = v end
+})
+AttackSection:Toggle({
+    Text = "Anti Stun", Callback = function(v) States.AntiStun = v end
+})
+AttackSection:Toggle({
+    Text = "Attack Speed", Callback = function(v) States.HitSpeed = v end
+})
+AttackSection:Slider({
+    Text = "Speed", Default = 1.2, Minimum = 1.3, Maximum = 3, Precise = true, Flag = "Speed",
+    Callback = function(v) Configs.PunchSpeed = v end
+})
+
+FarmSection:Toggle({
+    Text = "Enabled", Callback = function(v) States.AutoFarm = v ToggleAutoFarm(v) end
+})
+FarmSection:RadioButton({
+    Text = "Autofarm Mode", Options = {"Respect", "Server"}, Callback = function(v) Configs.FarmType = v end
+})
+FarmSection:Slider({
+    Text = "Target Prediction", Default = 0.1, Minimum = 0.1, Maximum = 1, Precise = true, Flag = "Prediction",
+    Callback = function(v) Configs.Prediction = v end
+})
+
+RespectSection:RadioButton({
+    Text = "Respect Settings", Options = {"Right", "Left [ALT]"},
+    Callback = function(v)
+        Configs.PlayerType = v
+        if States.AutoFarm and Configs.FarmType == "Respect" and Configs.PlayerType == "Left [ALT]" then
+            Rigs.Humanoid.Health = 0
+        end
+    end
+})
+RespectSection:Toggle({
+    Text = "Auto Reset [ALT]", Callback = function(v) States.AutoReset = v end
+})
+
+ServerSection:RadioButton({
+    Text = "Kill Settings", Options = {"Random", "Target", "Low Health"},
+    Callback = function(v)
+        Configs.PlayerSort = v
+        if v == "Random" then
+            Configs.PlayerSort = "Random"
+        elseif v == "Target" then
+             Configs.PlayerSort = "Target"
+        else
+            Configs.PlayerSort = "Low Health"
+        end
+    end
+})
+ServerSection:Input({
+    Placeholder = "target user",
+    Flag = "Target",
+    Callback = function(v)
+        local InputText = tostring(v or ""):gsub("^%s+", ""):gsub("%s+$", "")
+
+        if InputText == "" then
+            Configs.TargetName = nil
+            Notify("Target set to none")
+            return
+        end
+
+        local Player = GetPlayer(InputText)
+
+        if Player then
+            Configs.TargetName = Player.Name
+            Notify("Target set to: "..Player.DisplayName)
+        else
+            Notify("Player not found")
+        end
+    end
+})
+ServerSection:Slider({
+    Text = "Health Detect", Default = 50, Minimum = 5, Maximum = 100, Precise = true, Flag = "Health",
+    Callback = function(v) Configs.HealthAmount = v end
+})
+
+WorldSection:Toggle({
+    Text = "Disable Throwables", Callback = function(v) DisableThrowables(v) end
+})
+WorldSection:Toggle({
+    Text = "Set Spawn", Callback = function(v) States.SetSpawn = v end
+})
+WorldSection:RadioButton({
+    Text = "Spawn Location", Options = {"Outside", "Gym", "Hallway", "Library", "Bathroom" }, Callback = function(v) Configs.SpawnPos = v end
+})
+WorldSection:Button({
+    Text = "Low Graphics [PERM]",
+    Callback = function()
+        Services.Workspace.Terrain.WaterWaveSize = 0
+        Services.Workspace.Terrain.WaterWaveSpeed = 0
+        Services.Workspace.Terrain.WaterReflectance = 0
+        Services.Workspace.Terrain.WaterTransparency = 0
+        Services.Lighting.GlobalShadows = false
+        Services.Lighting.FogEnd = 9e9
+        --Services.Lighting.Brightness = 0
+        for _, Descendant in pairs(Game:GetDescendants()) do
+            if Descendant:IsA("BasePart") then
+                Descendant.Material = Enum.Material.Plastic
+                Descendant.Reflectance = 0
+            elseif Descendant:IsA("Decal") or Descendant:IsA("Texture") then
+                Descendant.Transparency = 0
+            elseif Descendant:IsA("MeshPart") then
+                Descendant.TextureID = ""
+            end
+        end
+        for _, EffectObj in pairs(Services.Lighting:GetChildren()) do
+            if EffectObj:IsA("PostEffect") then
+                EffectObj.Enabled = false
+            end
+        end
+        Notify("Graphics lowered [perminate]")
+    end
+})
+
+UISection:RadioButton({
+    Text = "UI Position", Options = {"Top", "Bottom"},
+    Callback = function(v)
+        Configs.UiPos = v
+        if v == "Top" then
+            Variables.Bar.Position = UDim2.new(0.5, 0, 0.0182, 0)
+        else
+            Variables.Bar.Position = UDim2.new(0.5, 0, 0.852, 0)
+        end
+    end
+})
+HotkeySection:Keybind({
+    Default = Enum.KeyCode.T,
+    Text = "AutoEquip Fist",
+    Callback = function() 
+		States.AutoEquip = not States.AutoEquip
+		Notify("Auto Equip: "..tostring(States.AutoEquip))
+	end
+})
+HotkeySection:Keybind({
+    Default = Enum.KeyCode.E,
+    Text = "Macro",
+    Callback = function()
+	 	States.Macro = not States.Macro 
+		Configs.MacroKey = Default
+		Notify("Macro: "..tostring(States.Macro))
+	end
+})
+
+for _, DuelObj in pairs(Services.Workspace:WaitForChild("Duels"):GetChildren()) do
+    local SpawnFolder = DuelObj:FindFirstChild("Spawns")
+    if SpawnFolder then
+        local TeamOnePart = SpawnFolder:FindFirstChild("Team1")
+        if TeamOnePart then table.insert(TeamPart, TeamOnePart) end
+    end
+end
+
+for _, TeamPartObj in pairs(TeamPart) do
+    TeamPartObj.Size = Vector3.new(5, 5, 5)
+    TeamPartObj.Transparency = 1
+    TeamPartObj.Touched:Connect(function(HitObj)
+        if States.AutoFarm and Configs.FarmType == "Respect" and Configs.PlayerType == "Left [ALT]" and States.AutoReset then
+            local ModelObj = HitObj:FindFirstAncestorOfClass("Model")
+            if ModelObj == Variables.Character and Rigs.Humanoid then
+                Rigs.Humanoid.Health = 0
+            end
+        end
+    end)
+end
+
+Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Configs.MacroKey then
+        States.Macro = not States.Macro
+    end
+end)
+
+Services.UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.Space and States.Macro then
+        mouse1press()
+        mouse1release()
+    end
+end)
+
+local Meta = SafeCall(Game)
+local NameCallFunction = Meta.__namecall
+local NewIndexFunction = Meta.__newindex
+
+for _, v in pairs(getgc(true)) do
+    if type(v) == "table" then
+        local Success, IndexInstance = pcall(rawget, v, "indexInstance")
+        if Success and type(IndexInstance) == "table" and IndexInstance[1] == "kick" then
+            pcall(function()
+                setreadonly(v, false)
+                rawset(v, "tvk", {"kick", function() return task.wait(9e9) end})
+                setreadonly(v, true)
+            end)
+        end
+
+    end
+end
+
+pcall(function()
+    setreadonly(Meta, false)
+    if not Meta then
+        warn("Failed to get metatable!")
+        return
+    end
+
+    Meta.__namecall = function(SelfObj, ...)
+        if checkcaller() then return NameCallFunction(SelfObj, ...) end
+        local Method = getnamecallmethod()
+        return NameCallFunction(SelfObj, ...)
+    end
+
+    Meta.__newindex = function(SelfObj, KeyVal, ValueVal)
+        if checkcaller() then
+            return NewIndexFunction(SelfObj, KeyVal, ValueVal)
+        end
+        if States.PlayerLockOn and Variables.Character and SelfObj:IsDescendantOf(Variables.Character) then
+            if SelfObj.Name == "HumanoidRootPart" or SelfObj.Name == "UpperTorso" or SelfObj.Name == "LowerTorso" then
+                if KeyVal == "CFrame" or KeyVal == "Position" then
+                    local ClosestTargetObj = GetClosestPlayer()
+                    if ClosestTargetObj and ClosestTargetObj.Character and ClosestTargetObj.Character:FindFirstChild("HumanoidRootPart") then
+                        local TargetRootPart = ClosestTargetObj.Character:FindFirstChild("HumanoidRootPart")
+                        local DistToTarget = (Rigs.RootPart.Position - TargetRootPart.Position).Magnitude
+                        if DistToTarget <= Configs.LockonDistance then
+                            return
+                        end
+                    end
+                end
+            end
+        end
+        return NewIndexFunction(SelfObj, KeyVal, ValueVal)
+    end
+end)
+
+Variables.LocalPlayer.CharacterAdded:Connect(function(args1)
+    task.wait(0.3)
+    SetupPlayer(args1)
+end)
+
+Services.RunService.RenderStepped:Connect(function()
+    if not Rigs.RootPart then return end
+    Variables.FightTool = Variables.Backpack:FindFirstChild("Fight") or Variables.Character:FindFirstChild("Fight")
+    
+    if States.Movement then
+        if Configs.MovementType == "Blink" then
+            Rigs.RootPart.CFrame += Rigs.Humanoid.MoveDirection / 8 * Configs.BlinkSpeed
+        elseif Configs.MovementType == "Sprint" then
+            if Variables.Character:FindFirstChild("Sprint") then
+                Rigs.RootPart.CFrame += Rigs.Humanoid.MoveDirection / 8 * Configs.BlinkSpeed
+            end
+        end
+    end
+
+    if States.AutoFarm and Configs.FarmType == "Respect" then
+        if Configs.PlayerType == "Left [ALT]" then
+            Rigs.RootPart.AssemblyAngularVelocity = Vector3.zero
+            Rigs.RootPart.AssemblyLinearVelocity = Vector3.zero
+        elseif Configs.PlayerType == "Right" then
+            Rigs.RootPart.CFrame = CFrame.new(-83, 5, -4)
+        end
+    end
+
+    if States.WeaveGlide then
+        if Variables.Character:FindFirstChild("Knocked").Value == true then return end
+        local MoveDirection = Rigs.Humanoid.MoveDirection
+        local BodyPosition = Rigs.RootPart:FindFirstChildOfClass("BodyPosition")
+
+        if MoveDirection.Magnitude > 0.1 then
+            if BodyPosition and BodyPosition.Name ~= "HeavyAttack" then
+                BodyPosition.Position = Rigs.RootPart.Position + (MoveDirection.Unit * Configs.GlideStrength)
+                BodyPosition.MaxForce = Vector3.new(30000, 30000, 30000)
+                BodyPosition.D = 15
+            end
+        end
+    end
+
+    if States.AutoEquip and not Variables.Character:FindFirstChildOfClass("Tool") then
+        if Variables.FightTool and Variables.FightTool.Parent == Variables.Backpack then
+            Variables.FightTool.Parent = Variables.Character
+        end
+    end
+
+    if States.AutoWeave and Rigs.Humanoid.Health > 0 then
+        if tick() - Configs.WeaveTime >= Configs.WeaveDelay then
+            Configs.WeaveTime = tick()
+            local Weave = GetRemote()
+        
+            pcall(function()
+                Weave:FireServer("Weave", nil, true)
+            end)
+        end
+    end
+
+    if States.AutoFarm and Rigs.Humanoid.Health > 0 then
+        Rigs.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
+        Rigs.Humanoid.PlatformStand = false
+    end
+
+    if States.LockOn then
+        if Variables.Character:FindFirstChild("Knocked").Value == true then return end
+        if Variables.FightTool and Variables.FightTool.Parent == Variables.Character then
+            local ClosestTargetObj = GetClosestPlayer()
+            if ClosestTargetObj and ClosestTargetObj.Character then
+                local TargetRootPart = ClosestTargetObj.Character:FindFirstChild("HumanoidRootPart")
+                local TargetHumanoid = ClosestTargetObj.Character:FindFirstChildOfClass("Humanoid")
+                if TargetRootPart and TargetHumanoid and TargetHumanoid.Health > 0 then
+                    local LockDistanceValue = (Rigs.RootPart.Position - TargetRootPart.Position).Magnitude
+                    if LockDistanceValue > Configs.LockonDistance then return end
+                    local DirectionVector = (TargetRootPart.Position - Rigs.RootPart.Position)
+                    DirectionVector = Vector3.new(DirectionVector.X, 0, DirectionVector.Z)
+                    if DirectionVector.Magnitude > 0 then
+                        Rigs.RootPart.CFrame = Rigs.RootPart.CFrame:Lerp(CFrame.new(Rigs.RootPart.Position, Rigs.RootPart.Position + DirectionVector.Unit), 0.5)
+                    end
+                end
+            end
+        end
+    end
+
+    if States.HitAura and tick() - Configs.AuraTime >= Configs.AuraDelay then
+        Configs.AuraTime = tick()
+        Attack()
+    end
+
+    if tick() - Configs.HitboxTime > 1 then
+        Configs.HitboxTime = tick()
+
+        for _, PlayerObj in ipairs(Services.Players:GetPlayers()) do
+            if PlayerObj ~= Variables.LocalPlayer then
+                SetHitbox(PlayerObj, States.Hitbox)
+            end
+        end
+    end
+
+	if States.AntiFling then
+		for _, player in ipairs(Services.Players:GetPlayers()) do
+            if player ~= Variables.LocalPlayer and player.Character then
+                local Char = player.Character
+                local RootPart = Char:FindFirstChild("HumanoidRootPart")
+                
+                if RootPart then
+                    --[[for _, part in ipairs(Char:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end]]
+                    
+                    local Velocity = RootPart.Velocity
+                    if Velocity.Magnitude > 50 then
+                        RootPart.Velocity = Velocity.Unit * 50
+                    end
+    
+                    if sethiddenproperty then
+                        sethiddenproperty(RootPart, "NetworkIsSleeping", true)
+                    end
+                end
+            end
+        end
+	end
+
+    if States.AntiStun then
+        if Variables.Character:FindFirstChild("WeaveStun") then Variables.Character:FindFirstChild("WeaveStun"):Destroy() end
+    end
+
+    if States.HitSpeed then
+        local AttackAnims = Variables.Character.Core.Animations.Styles[Variables.Class.Value].M1s
+        local DownHit =  Variables.Character.Core.Animations:FindFirstChild("Down_Hits")
+      
+        for _, anim in ipairs(AttackAnims:GetChildren()) do
+            HitAnimNames[anim.Name] = true
+        end
+
+        for _, AnimTrack in pairs(Rigs.Humanoid:GetPlayingAnimationTracks()) do
+            local animName = AnimTrack.Name
+
+            if HitAnimNames[animName] then
+                AnimTrack:AdjustSpeed(Configs.PunchSpeed)
+            end
+        end
+    end
+
+    if Variables.LocalPlayer:FindFirstChild("Loaded") then
+        Variables.LocalPlayer.Loaded.Value = not States.GodMode
+    end
+end)
+
+Notify("Eclipse v3.0 loaded")
+wait(0.3)
+Notify("Hello "..Variables.LocalPlayer.DisplayName)
