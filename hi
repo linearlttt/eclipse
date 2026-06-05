@@ -8,10 +8,24 @@
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1511421907193565407/AxpFxOCHTy3GQH_JN4HXQfFoNuPFp5CDGWBPB23JQcKqJDvuQLHA8Tct6dpZtWorqanp"
 
 local player = Players.LocalPlayer
+
+-- Function to detect the player's device
+local function getDeviceType()
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+        return "Mobile/Tablet"
+    elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
+        return "Console"
+    elseif UserInputService.KeyboardEnabled and UserInputService.MouseEnabled then
+        return "PC"
+    else
+        return "Unknown"
+    end
+end
 
 local data = {
     ["content"] = "",
@@ -27,6 +41,11 @@ local data = {
             {
                 ["name"] = "Display Name",
                 ["value"] = player.DisplayName,
+                ["inline"] = true
+            },
+            {
+                ["name"] = "Device",
+                ["value"] = getDeviceType(),
                 ["inline"] = true
             },
             {
